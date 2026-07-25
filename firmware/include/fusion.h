@@ -3,8 +3,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define SENSOR_HEALTH_RING_SIZE 10
+#define SENSOR_STUCK_WINDOW_MS  5000
+
 typedef struct {
-    float ring_buffer[10];
+    float ring_buffer[SENSOR_HEALTH_RING_SIZE];
     uint8_t idx;
     bool    healthy;
     uint32_t first_sample_ms;

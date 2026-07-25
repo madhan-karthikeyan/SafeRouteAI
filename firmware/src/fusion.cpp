@@ -59,12 +59,13 @@ void sensor_health_update(SensorHealth *h, float sample,
         h->healthy = false;
         return;
     }
-    h->ring_buffer[h->idx % 10] = sample;
+    h->ring_buffer[h->idx % SENSOR_HEALTH_RING_SIZE] = sample;
     h->idx++;
     h->last_sample_ms = now_ms;
 
-    if (h->idx >= 10 && (h->last_sample_ms - h->first_sample_ms >= 30000)) {
-        float var = compute_variance(h->ring_buffer, 10);
+    if (h->idx >= SENSOR_HEALTH_RING_SIZE &&
+        (h->last_sample_ms - h->first_sample_ms >= SENSOR_STUCK_WINDOW_MS)) {
+        float var = compute_variance(h->ring_buffer, SENSOR_HEALTH_RING_SIZE);
         if (var < SENSOR_NOISE_FLOOR) {
             h->healthy = false;
             return;

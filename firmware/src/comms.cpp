@@ -53,6 +53,9 @@ void comms_init(uint16_t node_id, comms_recv_cb_t cb) {
 
     esp_now_init();
     esp_now_register_recv_cb(on_data_recv);
+
+    uint8_t broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    comms_add_peer(broadcast_mac);
 }
 
 bool comms_add_peer(const uint8_t mac[6]) {

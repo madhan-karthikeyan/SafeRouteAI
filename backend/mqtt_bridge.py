@@ -7,10 +7,11 @@ emits to registered WebSocket connections.
 """
 
 import json
+import math
 import threading
 import time
 import paho.mqtt.client as mqtt
-from .models import NodeState, NetworkStats, EvacRoute, Snapshot
+from .models import NodeState, NetworkStats, EvacRoute, Snapshot, BuildingNode
 from .graph_service import load_graph, get_string_id, get_numeric_id
 from .heatmap_service import interpolate_heatmap, diffuse_grid
 from .snapshot_store import SnapshotStore
@@ -22,6 +23,10 @@ MQTT_TOPIC_STATUS = "evac/node/+/status"
 
 FLOOR_H = 5
 FLOOR_COUNT = 3
+FLOOR_W = 40
+FLOOR_D = 28
+SHELTER_THRESHOLD = 100000.0
+BLOCK_MULTIPLIER = 1e6
 
 
 class MqttBridge:
@@ -41,6 +46,9 @@ class MqttBridge:
         self._last_broadcast = time.time()
         self._running = False
         self._mqtt_client: mqtt.Client | None = None
+        self._heatmap_dirty = False
+        self._heatmap_interval = 0.5
+        self._last_heatmap_recompute = time.time()
 
         for f in range(FLOOR_COUNT):
             cols = 32
@@ -112,9 +120,7 @@ class MqttBridge:
             if len(self._active_fire_nodes) > 3:
                 self._status = "SHELTER_IN_PLACE"
 
-        for f in range(FLOOR_COUNT):
-            self._hazard_grids[f] = interpolate_heatmap(self.graph, self._node_states, f)
-            self._hazard_grids[f] = diffuse_grid(self._hazard_grids[f])
+        self._heatmap_dirty = True
 
     def _handle_status(self, topic: str, payload: str):
         parts = topic.split("/")
@@ -136,12 +142,100 @@ class MqttBridge:
         else:
             self._node_health[sid] = payload
 
+    def _recompute_heatmaps(self):
+        for f in range(FLOOR_COUNT):
+            self._hazard_grids[f] = interpolate_heatmap(self.graph, self._node_states, f)
+            self._hazard_grids[f] = diffuse_grid(self._hazard_grids[f])
+        self._heatmap_dirty = False
+
+    def _compute_edge_cost(self, sid_a: str, sid_b: str) -> float:
+        na = next((n for n in self.graph.nodes if n.id == sid_a), None)
+        nb = next((n for n in self.graph.nodes if n.id == sid_b), None)
+        if not na or not nb:
+            return SHELTER_THRESHOLD
+        dx = na.position.x - nb.position.x
+        dz = na.position.z - nb.position.z
+        dy = (na.position.y - nb.position.y) * 1.5
+        dist = math.hypot(math.hypot(dx, dz), dy)
+        if dist < 0.01:
+            return 0.0
+
+        ns_a = self._node_states.get(sid_a)
+        ns_b = self._node_states.get(sid_b)
+        if not ns_a or not ns_b:
+            return dist
+
+        if ns_a.flameDetected or ns_b.flameDetected:
+            return dist * BLOCK_MULTIPLIER
+
+        T_baseline, T_critical = 25.0, 80.0
+        S_baseline, S_critical = 0.0, 1000.0
+        T_norm = max(0.0, min(1.0, (ns_a.temperature - T_baseline) / (T_critical - T_baseline)))
+        S_norm = max(0.0, min(1.0, (ns_a.smoke * 1000.0 - S_baseline) / (S_critical - S_baseline)))
+        O_norm = max(0.0, min(1.0, ns_a.occupants / 10.0))
+        hazard_mult = math.exp(2.2 * T_norm + 1.6 * S_norm)
+        congestion = 0.5 * O_norm * dist
+        return dist * hazard_mult + congestion
+
+    def _compute_routes(self) -> list[EvacRoute]:
+        node_ids = [n.id for n in self.graph.nodes]
+        exit_ids = [n.id for n in self.graph.nodes if n.kind == "exit"]
+        if not exit_ids:
+            return []
+
+        adj: dict[str, list[tuple[str, float]]] = {nid: [] for nid in node_ids}
+        for e in self.graph.edges:
+            cost = self._compute_edge_cost(e.from_node, e.to_node)
+            adj[e.from_node].append((e.to_node, cost))
+            adj[e.to_node].append((e.from_node, cost))
+
+        routes: list[EvacRoute] = []
+        origin_candidates = [n.id for n in self.graph.nodes
+                             if n.kind != "exit" and n.id in self._node_states]
+        for src in origin_candidates[:9]:
+            dist: dict[str, float] = {nid: float('inf') for nid in node_ids}
+            prev: dict[str, str | None] = {nid: None for nid in node_ids}
+            dist[src] = 0.0
+            unvisited = set(node_ids)
+
+            while unvisited:
+                u = min(unvisited, key=lambda n: dist[n])
+                unvisited.remove(u)
+                if dist[u] == float('inf'):
+                    break
+                for v, w in adj[u]:
+                    alt = dist[u] + w
+                    if alt < dist[v]:
+                        dist[v] = alt
+                        prev[v] = u
+
+            nearest_exit = min(exit_ids, key=lambda eid: dist[eid])
+            if dist[nearest_exit] >= SHELTER_THRESHOLD:
+                continue
+
+            path: list[str] = []
+            cur = nearest_exit
+            while cur is not None:
+                path.append(cur)
+                cur = prev[cur]
+            path.reverse()
+            if len(path) < 2:
+                continue
+
+            routes.append(EvacRoute(
+                id=f"route-{src}",
+                path=path,
+                priority=max(0.0, min(1.0, 1.0 - len(path) / 30.0)),
+            ))
+
+        return routes
+
     def _build_snapshot(self) -> Snapshot:
         now_ms = int(time.time() * 1000)
         stale = sum(1 for ns in self._node_states.values()
                     if now_ms - ns.lastSeenMs > 10000)
 
-        routes: list[EvacRoute] = []
+        routes = self._compute_routes()
         stale_list = [
             sid for sid, ns in self._node_states.items()
             if now_ms - ns.lastSeenMs > 6000
@@ -188,6 +282,10 @@ class MqttBridge:
 
     def tick(self):
         with self._lock:
+            now = time.time()
+            if self._heatmap_dirty and (now - self._last_heatmap_recompute >= self._heatmap_interval):
+                self._recompute_heatmaps()
+                self._last_heatmap_recompute = now
             snap = self._build_snapshot()
             self.store.push(snap)
 

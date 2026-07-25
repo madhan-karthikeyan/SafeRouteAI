@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 
-"""Tests for Dijkstra pathfinding correctness."""
+"""
+Reference algorithm validation for Dijkstra pathfinding.
+
+This Python test validates the routing math (cost function, exit selection)
+independently of the embedded build. It does NOT compile or run C++ code.
+For firmware C++ unit tests (on-device via PlatformIO), see:
+    test/firmware/test_dijkstra.cpp
+
+Run: python3 tests/firmware/test_dijkstra.py
+"""
 
 import sys
 import os

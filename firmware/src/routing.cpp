@@ -147,19 +147,21 @@ DijkstraResult routing_compute(uint16_t own_id,
     }
 
     int walk = nearest_exit;
-    while (walk >= 0 && prev[walk] != 0 && prev[walk] != own_id) {
-        walk = -1;
-        for (int i = 0; i < graph->node_count; i++) {
-            if (graph->nodes[i].node_id == prev[walk < 0 ? 0 : walk]) {
-                walk = i;
-                break;
-            }
-        }
-        if (walk < 0) break;
-        if (prev[walk] == own_id) {
+    while (walk >= 0) {
+        uint16_t prev_id = prev[walk];
+        if (prev_id == 0) break;
+        if (prev_id == own_id) {
             result.next_hop = graph->nodes[walk].node_id;
             break;
         }
+        int next = -1;
+        for (int i = 0; i < graph->node_count; i++) {
+            if (graph->nodes[i].node_id == prev_id) {
+                next = i;
+                break;
+            }
+        }
+        walk = next;
     }
 
     if (result.next_hop == 0 && nearest_exit >= 0) {

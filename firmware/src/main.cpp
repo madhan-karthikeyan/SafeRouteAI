@@ -9,6 +9,7 @@
 #include "comms.h"
 #include "leds.h"
 #include "failsafe.h"
+#include "sensor_drivers.h"
 
 static const uint16_t MY_NODE_ID = 2;
 
@@ -78,13 +79,19 @@ static void on_packet_received(const HazardPacket *pkt) {
     table_updated = true;
 }
 
-static void simulate_sensor_readings(void) {
+static void read_sensors(void) {
+#ifdef REAL_HARDWARE
+    current_temp = sensor_read_temperature();
+    current_smoke = sensor_read_smoke();
+    current_flame = sensor_read_flame();
+#else
     current_temp = 25.0f + sinf(millis() / 10000.0f) * 2.0f;
     current_smoke = 0.0f;
     if (millis() > 15000) {
         current_temp += 15.0f;
         current_smoke += 200.0f + sinf(millis() / 5000.0f) * 50.0f;
     }
+#endif
 }
 
 void setup() {
@@ -105,6 +112,7 @@ void setup() {
     dual_path_init(&temp_filter, 0.3f, 2.0f, 5.0f);
     dual_path_init(&smoke_filter, 0.3f, 10.0f, 50.0f);
 
+    sensor_drivers_init();
     comms_init(MY_NODE_ID, on_packet_received);
 
     link_state_upsert((LinkStateTable *)active_table, MY_NODE_ID, 0,
@@ -122,7 +130,7 @@ void setup() {
 void loop() {
     unsigned long now = millis();
 
-    simulate_sensor_readings();
+    read_sensors();
 
     sensor_state_update(&sensor_state, current_temp, current_smoke, current_flame, now);
 
