@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {"id": 1, "floor": 0, "x": 0, "y": 0, "is_exit": true, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 10.0},
+    {"id": 2, "floor": 0, "x": 10, "y": 0, "is_exit": false, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 8.0},
+    {"id": 3, "floor": 0, "x": 20, "y": 5, "is_exit": false, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 8.0},
+    {"id": 4, "floor": 0, "x": 10, "y": 10, "is_exit": true, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 10.0},
+    {"id": 5, "floor": 0, "x": 0, "y": 10, "is_exit": false, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 8.0},
+    {"id": 6, "floor": 0, "x": 20, "y": -5, "is_exit": true, "T_baseline": 25.0, "T_critical": 80.0, "S_baseline": 0.0, "S_critical": 1000.0, "occupant_capacity": 10.0}
+  ],
+  "edges": [
+    {"from": 1, "to": 2, "base_distance": 10.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 2, "to": 3, "base_distance": 12.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 3, "to": 6, "base_distance": 10.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 2, "to": 4, "base_distance": 14.0, "occupant_capacity": 8, "floor_transition": false},
+    {"from": 4, "to": 5, "base_distance": 10.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 5, "to": 1, "base_distance": 10.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 5, "to": 2, "base_distance": 8.0, "occupant_capacity": 5, "floor_transition": false},
+    {"from": 3, "to": 4, "base_distance": 6.0, "occupant_capacity": 3, "floor_transition": false}
+  ]
+}

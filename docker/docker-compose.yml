@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: evac-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  nodered:
+    image: nodered/node-red:3
+    container_name: evac-dashboard
+    ports:
+      - "1880:1880"
+    volumes:
+      - ../dashboard:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped

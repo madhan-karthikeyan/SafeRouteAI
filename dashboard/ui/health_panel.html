@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><title>SafeRouteAI - Node Health</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+h1 { color: #00ff88; font-size: 24px; margin-bottom: 20px; }
+table { width: 100%; border-collapse: collapse; }
+th { color: #888; font-size: 12px; text-align: left; padding: 8px; border-bottom: 1px solid #333; text-transform: uppercase; }
+td { padding: 10px 8px; font-size: 14px; border-bottom: 1px solid #222; }
+.health-ok { color: #00ff88; }
+.health-fault { color: #ff4444; font-weight: bold; }
+.health-isolated { color: #ffd700; }
+.node-id { color: #fff; font-weight: bold; }
+</style></head>
+<body>
+<h1><i class="fas fa-heartbeat"></i> Node Health</h1>
+<table><thead><tr><th>Node</th><th>Status</th><th>Last Update</th></tr></thead>
+<tbody id="health-body"><tr><td colspan="3" style="color:#666">Waiting for data...</td></tr></tbody></table>
+<script>
+function updateHealth() {
+    fetch('/evac/api/health').then(r => r.json()).then(function(data) {
+        var tbody = document.getElementById('health-body');
+        var html = '';
+        for (var id in data) {
+            var s = data[id];
+            var cls = 'health-ok';
+            if (s.status && s.status.indexOf('FAULT') >= 0) cls = 'health-fault';
+            if (s.status && s.status.indexOf('isolated') >= 0) cls = 'health-isolated';
+            html += '<tr><td class="node-id">Node ' + id + '</td>';
+            html += '<td class="' + cls + '">' + (s.status || 'unknown') + '</td>';
+            html += '<td>' + new Date(s.updated).toLocaleTimeString() + '</td></tr>';
+        }
+        tbody.innerHTML = html || '<tr><td colspan="3" style="color:#666">No nodes reporting</td></tr>';
+    }).catch(function() {});
+}
+setInterval(updateHealth, 1000);
+updateHealth();
+</script>
+</body>
+</html>
