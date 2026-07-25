@@ -10,6 +10,20 @@ fire-evac-router/
 │   ├── src/           # main, routing, fusion, comms, leds, failsafe, gateway
 │   ├── include/       # HazardPacket, graph_topology, link_state, routing, etc.
 │   └── platformio.ini
+├── backend/           # FastAPI → WebSocket bridge (MQTT ↔ frontend)
+│   ├── main.py        # REST + WebSocket endpoints
+│   ├── mqtt_bridge.py # MQTT subscriber + Snapshot aggregation
+│   ├── graph_service.py
+│   ├── heatmap_service.py
+│   ├── snapshot_store.py
+│   └── requirements.txt
+├── frontend/          # React + Vite + R3F digital twin (Lovable-generated)
+│   ├── src/
+│   │   ├── api/       # SafeRouteApi interface, mock, http client
+│   │   ├── components/scene/  # 3D scene (Building, Nodes, Fire, Smoke, etc.)
+│   │   ├── components/panels/ # NodeHealth, NetworkStats, FireInjector, etc.
+│   │   └── stores/    # Zustand (useTwinStore, useUiStore)
+│   └── package.json
 ├── simulator/         # Python digital twin / injector
 │   ├── injector.py    # CLI fire injection tool
 │   ├── graph_model.py # topology + calibration loader
@@ -20,7 +34,7 @@ fire-evac-router/
 │   └── ui/            # floor grid, health panel, shelter panel
 ├── docs/              # engineering report, architecture
 ├── tests/             # firmware, simulator, integration tests
-├── docker/            # Mosquitto + Node-RED compose
+├── docker/            # Mosquitto + Node-RED + Backend compose
 └── scripts/           # build, test, demo runners
 ```
 
@@ -29,35 +43,33 @@ fire-evac-router/
 ### Prerequisites
 
 - PlatformIO (for firmware)
-- Python 3.10+ (for injector)
-- Docker (for dashboard)
+- Python 3.10+ (for injector + backend)
+- Node.js 18+ or Bun (for frontend)
+- Docker (for Mosquitto + Node-RED)
 - ESP32 dev board (or Wokwi simulation)
+
+### Full-Stack Demo (no hardware needed)
+
+```bash
+# 1. Install backend deps
+pip install -r backend/requirements.txt
+
+# 2. Install frontend deps
+cd frontend && bun install && cd ..
+
+# 3. Start everything
+./scripts/start-demo.sh
+# Frontend : http://localhost:5173  (3D digital twin)
+# Backend  : http://localhost:8000  (API + WebSocket)
+# API docs : http://localhost:8000/docs
+```
+
+The frontend runs in **mock mode** by default (`VITE_USE_MOCK=true`). Switch to live mode by setting `VITE_USE_MOCK=false` in `frontend/.env` — the frontend will then connect to the FastAPI backend, which bridges MQTT from the ESP32 mesh.
 
 ### Build Firmware
 
 ```bash
-cd firmware
 pio run --environment esp32dev
-```
-
-### Flash to Device
-
-```bash
-pio run --environment esp32dev -t upload
-```
-
-### Run Injector (CLI)
-
-```bash
-python3 simulator/injector.py --cli
-
-# Commands: slow | flashover | zone <id> | corrupt | clean | quit
-```
-
-### Generate a Test Packet
-
-```bash
-python3 simulator/injector.py --zone 3 --profile flashover --packet 2
 ```
 
 ### Run Tests
@@ -66,16 +78,24 @@ python3 simulator/injector.py --zone 3 --profile flashover --packet 2
 ./scripts/run-all-tests.sh
 ```
 
-### Start Dashboard
+### Run Injector (CLI)
+
+```bash
+python3 simulator/injector.py --cli
+# Commands: slow | flashover | zone <id> | corrupt | clean | quit
+```
+
+### Start Node-RED Dashboard
 
 ```bash
 cd docker
-docker-compose up -d
-# Open http://localhost:1880
-# Import dashboard/flows.json
+docker-compose up -d mosquitto nodered
+# Open http://localhost:1880 → Import dashboard/flows.json
 ```
 
 ## Architecture
+
+### Firmware (ESP32)
 
 ```
 Sensor read → dual-path conditioning → sensor fusion →
@@ -86,6 +106,17 @@ Sensor read → dual-path conditioning → sensor fusion →
   LED color/animation decision →
   gateway relays state to MQTT (best-effort, never on decision path)
 ```
+
+### Full Stack
+
+```
+ESP32 Mesh ──→ MQTT Broker ──→ FastAPI ──→ WebSocket ──→ React + R3F Frontend
+                    │                                    (3D Digital Twin)
+                    └──→ Node-RED Dashboard
+                         (legacy monitoring)
+```
+
+The frontend is a **read-only observer**. All routing, sensor fusion, and fail-safe decisions execute on the ESP32 mesh. The FastAPI backend aggregates per-node MQTT messages into unified Snapshots and pushes them via WebSocket. The frontend never computes a safety-critical path.
 
 ## Key Design Decisions
 
