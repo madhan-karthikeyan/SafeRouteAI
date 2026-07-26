@@ -7,6 +7,7 @@ emits to registered WebSocket connections.
 """
 
 import json
+import logging
 import math
 import threading
 import time
@@ -15,6 +16,8 @@ from .models import NodeState, NetworkStats, EvacRoute, Snapshot, BuildingNode
 from .graph_service import load_graph, get_string_id, get_numeric_id
 from .heatmap_service import interpolate_heatmap, diffuse_grid
 from .snapshot_store import SnapshotStore
+
+logger = logging.getLogger(__name__)
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -27,6 +30,7 @@ FLOOR_W = 40
 FLOOR_D = 28
 SHELTER_THRESHOLD = 100000.0
 BLOCK_MULTIPLIER = 1e6
+STALE_NODE_MS = 6000
 
 
 class MqttBridge:
@@ -67,6 +71,7 @@ class MqttBridge:
         try:
             payload = msg.payload.decode("utf-8")
         except Exception:
+            logger.warning("MQTT decode failure on topic=%s", topic)
             return
 
         with self._lock:
@@ -85,7 +90,7 @@ class MqttBridge:
             return
 
         numeric_id = data.get("node_id")
-        sid = get_string_id(numeric_id)
+        sid = get_string_id(numeric_id, self.graph)
         if sid is None:
             sid = f"n-0-0-{numeric_id % 24}"
 
@@ -130,8 +135,9 @@ class MqttBridge:
             numeric_id = int(parts[2])
         except ValueError:
             return
-        sid = get_string_id(numeric_id)
+        sid = get_string_id(numeric_id, self.graph)
         if sid is None:
+            logger.warning("Received status from unknown node_id=%d", numeric_id)
             return
 
         if "FAULT" in payload:
@@ -233,12 +239,12 @@ class MqttBridge:
     def _build_snapshot(self) -> Snapshot:
         now_ms = int(time.time() * 1000)
         stale = sum(1 for ns in self._node_states.values()
-                    if now_ms - ns.lastSeenMs > 10000)
+                     if now_ms - ns.lastSeenMs > STALE_NODE_MS)
 
         routes = self._compute_routes()
         stale_list = [
             sid for sid, ns in self._node_states.items()
-            if now_ms - ns.lastSeenMs > 6000
+            if now_ms - ns.lastSeenMs > STALE_NODE_MS
         ]
 
         return Snapshot(
@@ -269,9 +275,9 @@ class MqttBridge:
             client.subscribe(MQTT_TOPIC_STATUS)
             client.loop_start()
             self._mqtt_client = client
-            print(f"MQTT connected to {MQTT_BROKER}:{MQTT_PORT}")
+            logger.info("MQTT connected to %s:%d", MQTT_BROKER, MQTT_PORT)
         except Exception as e:
-            print(f"MQTT connection failed: {e} — running in mock-only mode")
+            logger.warning("MQTT connection failed: %s — running in mock-only mode", e)
             self._running = False
 
     def stop(self):

@@ -175,3 +175,41 @@ Occupancy → access_count → O_norm = occ/capacity    │
                                       WHITE_STROBE     GREEN/YELLOW/RED
                                       (shelter)        per decision logic
 ```
+
+## 9. Data Flow & MQTT Integration
+
+The SafeRoute AI platform decouples life-critical edge computation from remote monitoring telemetry through an asynchronous data flow architecture:
+
+```
+[Physical Sensors / Digital Twin Injector]
+       │
+       ▼
+[ESP32 Mesh Node]
+   ├── On-device Sensor Fusion & Dual-Path Filter
+   ├── Local Dijkstra Computation (Double-buffered Link State Table)
+   ├── FastLED Directional Guidance & Shelter-in-Place Controller
+   └── ESP-NOW Packet Flooding (Sub-10ms peer-to-peer relay)
+       │
+       ▼ (Gateway Node Relay)
+[Mosquitto MQTT Broker] (Topics: evac/node/+/hazard, evac/node/+/status)
+       ├──→ [FastAPI Backend Service] ──→ WebSocket Stream ──→ [React + R3F 3D Digital Twin]
+       └──→ [Node-RED Dashboard] ──→ 2D Floor Grid & Emergency Health Panel
+```
+
+- **ESP-NOW Mesh**: Sub-10ms latency per hop, sequence-number anti-replay, CRC16 corruption rejection.
+- **MQTT Bridge**: Publishes JSON payloads (`node_id`, `temp`, `smoke`, `flame`, `cost`) and status string (`OK`, `FAULT`).
+- **WebSocket Protocol**: Pushes unified snapshots every 200ms to frontend clients.
+
+## 10. Limitations & Edge Cases
+
+1. **RF Attenuation in Dense Metal/Concrete Structures**: High attenuation on 2.4GHz spectrum can reduce line-of-sight range. Managed via automatic fallback to neighbor consensus and redundant relay nodes.
+2. **Extreme Node Count Scaling**: Multi-hop ESP-NOW mesh flooding overhead scales with $O(N \cdot E)$. For facilities with $>500$ nodes, hierarchical sub-mesh partitioning with inter-zone gateway bridges is required.
+3. **Power Interruption**: While nodes include supercapacitor/battery backup, unexpected loss of power triggers neighbor nodes to mark the offline node as unreachable after 3 miss intervals (3000ms), immediately re-routing around the non-responsive area.
+
+## 11. Future Work & Deployment Roadmap
+
+1. **Sub-GHz Long-Range Mesh (LoRa / 868-915 MHz)**: Extend physical link layer range through thick concrete slabs and stairwells.
+2. **Machine Learning Edge Anomaly Detection**: Micro-TinyML models on ESP32-S3 to predict flashover 30-60 seconds before thermal runaway occurs based on multi-sensor rate signatures.
+3. **Building Management System (BMS / BACnet) Integration**: Automated trigger of smoke extraction fans, fire doors, and elevator lockdown based on live link-state cost heatmaps.
+4. **AR Navigation Integration for Firefighters**: Stream safest entry routes directly to heads-up displays (HUDs) worn by emergency responders.
+

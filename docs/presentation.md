@@ -11,11 +11,32 @@ Date: 2026
 - Centralized systems have a single point of failure
 - 300ms reaction time required for meaningful path correction
 
-## Slide 3: Solution Architecture
+## Slide 3: End-to-End System Architecture
+
 ```
-Decentralized mesh of ESP32 nodes
-Each node = sensor + router + visual indicator
-No central brain — each node decides independently
+┌─────────────────┐      ESP-NOW Mesh (TTL=4)      ┌──────────────────┐
+│ ESP32 Node #1   │ ◄────────────────────────────► │ ESP32 Node #2    │
+│ (DHT22/MQ-2/IR) │                                │ (Dijkstra Router)│
+└────────┬────────┘                                └─────────┬────────┘
+         │                                                   │
+         └───────────────────┐       ┌───────────────────────┘
+                             ▼       ▼
+                    ┌─────────────────────────┐
+                    │ Zone Gateway Node       │
+                    └────────────┬────────────┘
+                                 │ MQTT (Port 1883)
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ FastAPI Backend Bridge  │
+                    │ - Snapshot Ring Buffer  │
+                    │ - Async IDW Heatmap     │
+                    └────────────┬────────────┘
+                                 │ WebSockets (WS /api/events)
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ 3D Digital Twin EOC UI  │
+                    │ (Three.js / React)      │
+                    └─────────────────────────┘
 ```
 
 ## Slide 4: Technical Approach

@@ -130,7 +130,7 @@ class Injector:
 
     def run_cli(self):
         print("=== SafeRouteAI Injector CLI ===")
-        print("Commands: slow | flashover | zone <id> | corrupt | clean | quit")
+        print("Commands: slow | flashover | zone <id> | corrupt | clean | pub | quit")
         self.running = True
 
         while self.running:
@@ -159,6 +159,14 @@ class Injector:
                 self.set_corrupt_mode(True)
             elif cmd == "clean":
                 self.set_corrupt_mode(False)
+            elif cmd == "pub":
+                if self.target_zone is not None:
+                    self.publish_mqtt(self.target_zone)
+                    print(f"Published MQTT for zone {self.target_zone}")
+                else:
+                    for node in self.graph.nodes:
+                        self.publish_mqtt(node.node_id)
+                    print("Published MQTT for all nodes")
             elif cmd == "":
                 continue
             else:
@@ -192,9 +200,14 @@ def main():
     parser.add_argument("--profile", choices=["slow", "flashover"], default="slow")
     parser.add_argument("--corrupt", action="store_true", help="Enable corrupt packet mode")
     parser.add_argument("--packet", type=int, help="Generate one packet for given node ID and print")
+    parser.add_argument("--mqtt", action="store_true", help="Enable MQTT broadcasting")
+    parser.add_argument("--broker", default="localhost", help="MQTT broker host")
     args = parser.parse_args()
 
     injector = Injector(graph_path=args.graph)
+
+    if args.mqtt:
+        injector.connect_mqtt(broker=args.broker)
 
     if args.packet is not None:
         injector.print_packet(args.packet)
@@ -211,6 +224,8 @@ def main():
         print("Running injector in single-shot mode.")
         for node in injector.graph.nodes:
             injector.print_packet(node.node_id)
+            if args.mqtt:
+                injector.publish_mqtt(node.node_id)
 
 if __name__ == "__main__":
     main()

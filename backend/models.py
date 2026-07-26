@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
@@ -17,9 +17,10 @@ class BuildingNode(BaseModel):
 
 
 class BuildingEdge(BaseModel):
+    model_config = {"populate_by_name": True}
     id: str
-    from_node: str
-    to_node: str
+    from_node: str = Field(alias="from")
+    to_node: str = Field(alias="to")
 
 
 class Room(BaseModel):
@@ -29,6 +30,14 @@ class Room(BaseModel):
     width: float
     depth: float
     label: Optional[str] = None
+    type: Optional[str] = None
+
+
+class FloorPlanRoomSeg(BaseModel):
+    model_config = {"populate_by_name": True}
+    from_: tuple[float, float] = Field(alias="from")
+    to: tuple[float, float]
+    width: float
 
 
 class FloorPlan(BaseModel):
@@ -37,6 +46,7 @@ class FloorPlan(BaseModel):
     size: dict
     origin: Vec3
     rooms: list[Room]
+    corridors: list[FloorPlanRoomSeg]
 
 
 class BuildingGraph(BaseModel):
@@ -46,6 +56,59 @@ class BuildingGraph(BaseModel):
     nodes: list[BuildingNode]
     edges: list[BuildingEdge]
     hazardGrid: dict
+
+
+class BuildingMeta(BaseModel):
+    id: str
+    name: str
+    type: str
+    description: str
+    floors: int
+    totalRooms: int
+    totalExits: int
+    thumbnail: Optional[str] = None
+    source: Optional[str] = None
+    sourceUrl: Optional[str] = None
+    license: Optional[str] = None
+
+
+class BuildingDefRoom(BaseModel):
+    id: str
+    label: str
+    type: str
+    floor: int
+    x: float
+    z: float
+    width: float
+    depth: float
+    isExit: Optional[bool] = None
+    isStairwell: Optional[bool] = None
+    capacity: Optional[int] = None
+
+
+class CorridorDef(BaseModel):
+    id: str
+    fromRoom: str
+    toRoom: str
+    floor: int
+    width: float
+    junctionPoints: Optional[list[Vec3]] = None
+    isStairwell: Optional[bool] = None
+
+
+class BuildingDefFloor(BaseModel):
+    index: int
+    name: str
+    elevation: float
+    width: float
+    depth: float
+
+
+class BuildingDef(BaseModel):
+    meta: BuildingMeta
+    rooms: list[BuildingDefRoom]
+    corridors: list[CorridorDef]
+    floors: list[BuildingDefFloor]
 
 
 class NodeState(BaseModel):
@@ -82,7 +145,7 @@ class Snapshot(BaseModel):
     status: str
     scenario: str
     nodes: dict[str, NodeState]
-    hazard: dict[int, list[float]]
+    hazard: dict[str, list[float]]
     routes: list[EvacRoute]
     network: NetworkStats
     activeFireNodes: list[str]

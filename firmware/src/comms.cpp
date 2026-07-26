@@ -24,8 +24,12 @@ uint32_t seq_num_next(void) {
 bool seq_num_accept(uint16_t from_id, uint32_t seq) {
     if (from_id >= MAX_NODES) return false;
     uint32_t last = last_seq[from_id];
-    int32_t diff = (int32_t)(seq - last);
-    if (diff > 0 || (diff < 0 && last > 0xF0000000 && seq < 0x0FFFFFFF)) {
+    if (seq == last) return false;
+    /* RFC 1982 serial number arithmetic — works as long as the gap
+     * between two packets from the same source is < 2^31. With a
+     * per-packet increment that's ~136 years at 1 packet/sec, so
+     * this is safe for all practical scenarios. */
+    if ((int32_t)(seq - last) > 0) {
         last_seq[from_id] = seq;
         return true;
     }
@@ -40,7 +44,9 @@ static void on_data_recv(const uint8_t *mac, const uint8_t *data, int len) {
     memcpy(&pkt, data, sizeof(pkt));
 
     if (!hazard_packet_validate(&pkt)) return;
+    if (pkt.ttl == 0) return;
 
+    pkt.ttl--;
     user_cb(&pkt);
 }
 

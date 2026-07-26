@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define HAZARD_PACKET_SIZE 24
+#define HAZARD_PACKET_SIZE 26
 
 typedef struct __attribute__((packed)) {
     uint16_t node_id;
@@ -13,8 +13,11 @@ typedef struct __attribute__((packed)) {
     float    smoke_ppm;
     bool     flame_detected;
     float    edge_cost;
+    uint8_t  ttl;
     uint16_t crc16;
 } HazardPacket;
+
+#define DEFAULT_TTL 4
 
 #ifdef __cplusplus
 extern "C" {

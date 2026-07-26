@@ -1,0 +1,50 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: evac-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:z
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: evac-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: evac-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/api/events
+      - VITE_USE_MOCK=false
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: evac-dashboard
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./dashboard:/data:z
+    depends_on:
+      - mosquitto
+    restart: unless-stopped

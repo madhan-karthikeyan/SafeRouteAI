@@ -43,9 +43,11 @@ void link_state_age_edges(LinkStateTable *tbl, uint32_t now_ms, uint16_t own_id)
             float decayed = base * (1.0f + age_ratio * 10.0f);
             tbl->entries[i].edge_cost = decayed;
 
-            if (elapsed > STALE_TIMEOUT_MS * 3) {
-                tbl->entries[i].flame_detected = true;
-            }
+            // Communication loss is NOT fire detection.
+            // Do NOT set flame_detected here — it must come from actual
+            // sensor readings. Routing treats high cost as "avoid" and
+            // flame as "block entirely", so conflating the two would
+            // make stale nodes look like fires to the Dijkstra cost.
         }
     }
 }

@@ -6,7 +6,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ backend/
-COPY simulator/data/building_graph.json simulator/data/
+COPY frontend/src/assets/buildings frontend/src/assets/buildings/
 
 EXPOSE 8000
 

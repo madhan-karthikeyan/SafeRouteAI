@@ -163,6 +163,7 @@ void loop() {
             tx.smoke_ppm = current_smoke;
             tx.flame_detected = current_flame;
             tx.edge_cost = hazard;
+            tx.ttl = DEFAULT_TTL;
             tx.crc16 = hazard_packet_crc16(&tx);
             comms_broadcast(&tx);
             last_refresh_ms = now;
@@ -175,6 +176,7 @@ void loop() {
             tx.smoke_ppm = current_smoke;
             tx.flame_detected = current_flame;
             tx.edge_cost = hazard;
+            tx.ttl = DEFAULT_TTL;
             tx.crc16 = hazard_packet_crc16(&tx);
             comms_broadcast(&tx);
         }

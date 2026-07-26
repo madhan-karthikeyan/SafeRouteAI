@@ -210,7 +210,7 @@ bool hold_down_should_switch(uint16_t new_next_hop, uint16_t current_next_hop,
         return true;
     }
     uint32_t elapsed = now_ms - last_switch_ms;
-    if (elapsed < HOLD_DOWN_MS && new_cost > 0.7f * INFINITY) {
+    if (elapsed < HOLD_DOWN_MS && new_cost > 0.7f * SHELTER_THRESHOLD) {
         return false;
     }
     last_switch_ms = now_ms;
