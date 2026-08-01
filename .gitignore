@@ -10,3 +10,12 @@ frontend/.output/
 frontend/dist/
 frontend/.env
 backend/.env
+*.backup
+dashboard/node_modules/
+dashboard/.config.*.backup
+*.swp
+*.swo
+dist/
+build/
+.env.local
+*.log

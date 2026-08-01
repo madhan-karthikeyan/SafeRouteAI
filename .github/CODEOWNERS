@@ -1,0 +1,17 @@
+# Default owners
+* @maintainers
+
+# Firmware changes
+/firmware/ @firmware-maintainer
+
+# Backend changes
+/backend/ @backend-maintainer
+
+# Frontend changes
+/frontend/ @frontend-maintainer
+
+# Documentation changes
+/docs/ @docs-maintainer
+
+# CI/CD changes
+/.github/ @infra-maintainer
